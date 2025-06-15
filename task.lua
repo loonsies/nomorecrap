@@ -3,7 +3,6 @@ local throttle_timer = 0
 
 local function handleEntry(entry)
     chatManager:QueueCommand(-1, '/item "' .. entry.name .. '" <me>')
-    print(entry.interval)
     throttle_timer = os.clock() + entry.interval
 end
 
