@@ -37,7 +37,8 @@ local nmc = {
     }
 }
 local quantityInput = { 1 }
-local intervalInput = { 1.5 }
+local intervalInput = { 2.5 }
+local commandInput = { "" }
 queue = {}
 
 local function getItemName(id)
@@ -116,111 +117,182 @@ end
 
 local function drawUI()
     if imgui.Begin("nomorecrap", nmc.visible, ImGuiWindowFlags_AlwaysAutoResize) then
-        if #queue > 0 then
-            local totalTime = 0.0
-            for _, entry in ipairs(queue) do
-                totalTime = totalTime + (entry.interval or 0)
-            end
-            local mins = math.floor(totalTime / 60)
-            local secs = math.floor(totalTime % 60)
-            imgui.Text(string.format("%d tasks queued - est. %d:%02d", #queue, mins, secs))
-        else
-            imgui.Text("No tasks queued")
-        end
-        imgui.NewLine()
+        if imgui.BeginTabBar("##TabBar") then
+            if imgui.BeginTabItem("Item") then
+                if #queue > 0 then
+                    local totalTime = 0.0
+                    for _, entry in ipairs(queue) do
+                        totalTime = totalTime + (entry.interval or 0)
+                    end
+                    local mins = math.floor(totalTime / 60)
+                    local secs = math.floor(totalTime % 60)
+                    imgui.Text(string.format("%d tasks queued - est. %d:%02d", #queue, mins, secs))
+                else
+                    imgui.Text("No tasks queued")
+                end
+                imgui.NewLine()
 
-        imgui.Text("Search (" .. #nmc.search.results .. ")")
-        imgui.SetNextItemWidth(-1)
-        imgui.InputText("##SearchInput", nmc.search.input, 48)
+                imgui.Text("Search (" .. #nmc.search.results .. ")")
+                imgui.SetNextItemWidth(-1)
+                imgui.InputText("##SearchInput", nmc.search.input, 48)
 
-        if imgui.BeginTable("##SearchResultsTableChild", 2, bit.bor(ImGuiTableFlags_ScrollY), { 0, 150 }) then
-            imgui.TableSetupColumn("##ItemColumn", ImGuiTableColumnFlags_WidthStretch)
-            if nmc.search.status == searchStatus.found then
-                local clipper = ImGuiListClipper.new()
-                clipper:Begin(#nmc.search.results, -1)
+                if imgui.BeginTable("##SearchResultsTableChild", 2, bit.bor(ImGuiTableFlags_ScrollY), { 0, 150 }) then
+                    imgui.TableSetupColumn("##ItemColumn", ImGuiTableColumnFlags_WidthStretch)
+                    if nmc.search.status == searchStatus.found then
+                        local clipper = ImGuiListClipper.new()
+                        clipper:Begin(#nmc.search.results, -1)
 
-                while clipper:Step() do
-                    for i = clipper.DisplayStart, clipper.DisplayEnd - 1 do
-                        local itemId = nmc.search.results[i + 1]
-                        local itemName = getItemName(itemId)
-                        local ownedQty = findQuantity(itemId)
-                        local isSelected = (nmc.search.selectedItem == itemId)
+                        while clipper:Step() do
+                            for i = clipper.DisplayStart, clipper.DisplayEnd - 1 do
+                                local itemId = nmc.search.results[i + 1]
+                                local itemName = getItemName(itemId)
+                                local ownedQty = findQuantity(itemId)
+                                local isSelected = (nmc.search.selectedItem == itemId)
 
-                        imgui.PushID(itemId)
+                                imgui.PushID(itemId)
+                                imgui.TableNextRow()
+
+                                imgui.TableSetColumnIndex(0)
+                                if imgui.Selectable(string.format("%s (%d)", itemName, ownedQty), isSelected) then
+                                    nmc.search.selectedItem = itemId
+                                end
+
+                                imgui.TableSetColumnIndex(1)
+                                if imgui.Button("Max") then
+                                    quantityInput[1] = ownedQty
+                                    nmc.search.selectedItem = itemId
+                                end
+
+                                imgui.PopID()
+                            end
+                        end
+
+                        clipper:End()
+                    else
                         imgui.TableNextRow()
-
                         imgui.TableSetColumnIndex(0)
-                        if imgui.Selectable(string.format("%s (%d)", itemName, ownedQty), isSelected) then
-                            nmc.search.selectedItem = itemId
-                        end
+                        imgui.Text(searchStatus[nmc.search.status])
+                    end
+                    imgui.EndTable()
+                end
 
-                        imgui.TableSetColumnIndex(1)
-                        if imgui.Button("Max") then
-                            quantityInput[1] = ownedQty
-                        end
+                if imgui.Button("Refresh") then
+                    scanInventory()
+                end
+                imgui.SameLine()
 
-                        imgui.PopID()
+                if imgui.Button("Start") then
+                    if nmc.search.selectedItem ~= nil then
+                        local currentItem = getItemById(nmc.search.selectedItem)
+                        local ownedQuantity = findQuantity(nmc.search.selectedItem)
+                        if quantityInput[1] > ownedQuantity then
+                            print(chat.header(addon.name):append(chat.error(
+                                "Quantity set superior to owned quantity. Aborting")))
+                            return
+                        end
+                        if currentItem and quantityInput[1] >= 1 and intervalInput[1] >= 0.5 and hasQuantity(currentItem.Id, quantityInput[1]) then
+                            for i = 1, quantityInput[1] do
+                                entry = {
+                                    id = currentItem.Id,
+                                    name = currentItem.Name[1],
+                                    interval = intervalInput[1],
+                                    type = taskTypes.item
+                                }
+                                task.enqueue(entry)
+                            end
+                        else
+                            print(chat.header(addon.name):append(chat.error("Argument error. Aborting")))
+                        end
+                    end
+                end
+                imgui.SameLine()
+
+                if imgui.Button("Stop") then
+                    task.clear()
+                end
+                imgui.SameLine()
+
+                imgui.Text("Quantity")
+                imgui.SameLine()
+                imgui.SetNextItemWidth(150)
+                if imgui.InputInt("##QuantityInputInt", quantityInput) then
+                    if quantityInput[1] < 1 then
+                        quantityInput = { 1 }
+                    end
+                end
+                imgui.SameLine()
+
+                imgui.Text("Interval")
+                imgui.SameLine()
+                imgui.SetNextItemWidth(150)
+                if imgui.InputFloat("##IntervalInputFloat", intervalInput, 0.5, 0.1) then
+                    if intervalInput[1] < 0.5 then
+                        intervalInput = { 0.5 }
                     end
                 end
 
-                clipper:End()
-            else
-                imgui.TableNextRow()
-                imgui.TableSetColumnIndex(0)
-                imgui.Text(searchStatus[nmc.search.status])
+                imgui.EndTabItem()
             end
-            imgui.EndTable()
-        end
-    end
 
-    if imgui.Button("Refresh") then
-        scanInventory()
-    end
-    imgui.SameLine()
+            if imgui.BeginTabItem("Command") then
+                if #queue > 0 then
+                    local totalTime = 0.0
+                    for _, entry in ipairs(queue) do
+                        totalTime = totalTime + (entry.interval or 0)
+                    end
+                    local mins = math.floor(totalTime / 60)
+                    local secs = math.floor(totalTime % 60)
+                    imgui.Text(string.format("%d tasks queued - est. %d:%02d", #queue, mins, secs))
+                else
+                    imgui.Text("No tasks queued")
+                end
 
-    if imgui.Button("Start") then
-        local currentItem = getItemById(nmc.search.selectedItem)
-        local ownedQuantity = findQuantity(nmc.search.selectedItem)
-        if quantityInput[1] > ownedQuantity then
-            print(chat.header(addon.name):append(chat.error("Quantity set superior to owned quantity. Aborting")))
-            return
-        end
-        if currentItem and quantityInput[1] >= 1 and intervalInput[1] >= 0.5 and hasQuantity(currentItem.Id, quantityInput[1]) then
-            for i = 1, quantityInput[1] do
-                entry = {
-                    id = currentItem.Id,
-                    name = currentItem.Name[1],
-                    interval = intervalInput[1]
-                }
-                task.enqueue(entry)
+                imgui.SetNextItemWidth(-1)
+                imgui.InputText("##CommandInput", commandInput, 256)
+
+                if imgui.Button("Start") then
+                    if commandInput[1] ~= nil and commandInput[1][1] == "/" then
+                        for i = 1, quantityInput[1] do
+                            entry = {
+                                interval = intervalInput[1],
+                                type = taskTypes.command,
+                                command = commandInput[1]
+                            }
+                            task.enqueue(entry)
+                        end
+                    else
+                        print(chat.header(addon.name):append(chat.error("Argument error. Aborting")))
+                    end
+                end
+                imgui.SameLine()
+
+                if imgui.Button("Stop") then
+                    task.clear()
+                end
+                imgui.SameLine()
+
+                imgui.Text("Quantity")
+                imgui.SameLine()
+                imgui.SetNextItemWidth(150)
+                if imgui.InputInt("##QuantityInputInt", quantityInput) then
+                    if quantityInput[1] < 1 then
+                        quantityInput = { 1 }
+                    end
+                end
+                imgui.SameLine()
+
+                imgui.Text("Interval")
+                imgui.SameLine()
+                imgui.SetNextItemWidth(150)
+                if imgui.InputFloat("##IntervalInputFloat", intervalInput, 0.5, 0.1) then
+                    if intervalInput[1] < 0.5 then
+                        intervalInput = { 0.5 }
+                    end
+                end
+
+                imgui.EndTabItem()
             end
-        else
-            print(chat.header(addon.name):append(chat.error("Argument error. Aborting")))
-        end
-    end
-    imgui.SameLine()
-
-    if imgui.Button("Stop") then
-        task.clear()
-    end
-    imgui.SameLine()
-
-    imgui.Text("Quantity")
-    imgui.SameLine()
-    imgui.SetNextItemWidth(150)
-    if imgui.InputInt("##QuantityInputInt", quantityInput) then
-        if quantityInput[1] < 1 then
-            quantityInput = { 1 }
-        end
-    end
-    imgui.SameLine()
-
-    imgui.Text("Interval")
-    imgui.SameLine()
-    imgui.SetNextItemWidth(150)
-    if imgui.InputFloat("##IntervalInputFloat", intervalInput, 0.5, 0.1) then
-        if intervalInput[1] < 0.5 then
-            intervalInput = { 0.5 }
+            imgui.EndTabBar()
         end
     end
 end

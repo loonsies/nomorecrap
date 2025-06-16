@@ -1,9 +1,21 @@
 task = {}
 local throttle_timer = 0
 
+taskTypes = {
+    item = 1,
+    command = 2,
+}
+
 local function handleEntry(entry)
-    chatManager:QueueCommand(-1, '/item "' .. entry.name .. '" <me>')
-    throttle_timer = os.clock() + entry.interval
+    if entry.type == taskTypes.item then
+        chatManager:QueueCommand(-1, '/item "' .. entry.name .. '" <me>')
+        throttle_timer = os.clock() + entry.interval
+    elseif entry.type == taskTypes.command then
+        chatManager:QueueCommand(-1, entry.command)
+        throttle_timer = os.clock() + entry.interval
+    else
+        print("Unknown task type: " .. tostring(entry.type))
+    end
 end
 
 local function handleQueue()
