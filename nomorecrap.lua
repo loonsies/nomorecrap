@@ -2,7 +2,7 @@ addon.name = "nomorecrap"
 addon.version = "0.1"
 addon.author = "looney"
 addon.desc = "nomorecrap!!!"
-addon.link = 'https://github.com/loonsies/nomorecrap';
+addon.link = 'https://github.com/loonsies/nomorecrap'
 
 -- Ashita dependencies
 require "common"
@@ -36,7 +36,7 @@ local nmc = {
 local quantityInput = { 1 }
 local intervalInput = { 2.5 }
 local commandInput = { "" }
-queue = {}
+local queue = {}
 
 local function getItemName(id)
     return AshitaCore:GetResourceManager():GetItemById(tonumber(id)).Name[1]
@@ -76,8 +76,8 @@ function findQuantity(item_id)
 end
 
 local function scanInventory()
-    inv = {}
-    ids = {}
+    local inv = {}
+    local ids = {}
     local items = AshitaCore:GetMemoryManager():GetInventory()
     for ind = 1, items:GetContainerCountMax(0) do
         local invItem = items:GetContainerItem(0, ind)

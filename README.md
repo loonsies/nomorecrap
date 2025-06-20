@@ -1,6 +1,6 @@
 # nomorecrap
 
-A simple Ashita v4 addon meant to queue useable items (like silt pouches)
+A simple Ashita v4 addon meant to queue useable items (like silt pouches) and commands
 
 ![image](https://github.com/user-attachments/assets/74443bad-e1dd-4f05-abf3-16005f41de43)
 
