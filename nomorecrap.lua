@@ -9,9 +9,6 @@ require "common"
 settings = require("settings")
 chat = require("chat")
 imgui = require('imgui')
-resourceManager = AshitaCore:GetResourceManager()
-memoryManager = AshitaCore:GetMemoryManager()
-chatManager = AshitaCore:GetChatManager()
 
 -- Local dependencies
 task = require("task")
@@ -42,16 +39,16 @@ local commandInput = { "" }
 queue = {}
 
 local function getItemName(id)
-    return resourceManager:GetItemById(tonumber(id)).Name[1]
+    return AshitaCore:GetResourceManager():GetItemById(tonumber(id)).Name[1]
 end
 
 function getItemById(id)
-    return resourceManager:GetItemById(tonumber(id))
+    return AshitaCore:GetResourceManager():GetItemById(tonumber(id))
 end
 
 function hasQuantity(item_id, item_count)
     local count = 0
-    local items = memoryManager:GetInventory()
+    local items = AshitaCore:GetMemoryManager():GetInventory()
     for ind = 1, items:GetContainerCountMax(0) do
         local item = items:GetContainerItem(0, ind)
         if item ~= nil and item.Id == item_id and item.Flags == 0 then
@@ -68,7 +65,7 @@ end
 
 function findQuantity(item_id)
     local count = 0
-    local items = memoryManager:GetInventory()
+    local items = AshitaCore:GetMemoryManager():GetInventory()
     for ind = 1, items:GetContainerCountMax(0) do
         local item = items:GetContainerItem(0, ind)
         if item ~= nil and item.Id == item_id then
@@ -81,7 +78,7 @@ end
 local function scanInventory()
     inv = {}
     ids = {}
-    local items = memoryManager:GetInventory()
+    local items = AshitaCore:GetMemoryManager():GetInventory()
     for ind = 1, items:GetContainerCountMax(0) do
         local invItem = items:GetContainerItem(0, ind)
         if invItem ~= nil then

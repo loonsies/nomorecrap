@@ -8,10 +8,10 @@ taskTypes = {
 
 local function handleEntry(entry)
     if entry.type == taskTypes.item then
-        chatManager:QueueCommand(-1, '/item "' .. entry.name .. '" <me>')
+        AshitaCore:GetChatManager():QueueCommand(-1, '/item "' .. entry.name .. '" <me>')
         throttle_timer = os.clock() + entry.interval
     elseif entry.type == taskTypes.command then
-        chatManager:QueueCommand(-1, entry.command)
+        AshitaCore:GetChatManager():QueueCommand(-1, entry.command)
         throttle_timer = os.clock() + entry.interval
     else
         print("Unknown task type: " .. tostring(entry.type))
