@@ -36,7 +36,7 @@ local nmc = {
 local quantityInput = { 1 }
 local intervalInput = { 2.5 }
 local commandInput = { "" }
-local queue = {}
+queue = {}
 
 local function getItemName(id)
     return AshitaCore:GetResourceManager():GetItemById(tonumber(id)).Name[1]
