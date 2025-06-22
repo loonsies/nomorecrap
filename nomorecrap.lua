@@ -1,5 +1,5 @@
 addon.name = "nomorecrap"
-addon.version = "0.1"
+addon.version = "0.2"
 addon.author = "looney"
 addon.desc = "nomorecrap!!!"
 addon.link = 'https://github.com/loonsies/nomorecrap'
