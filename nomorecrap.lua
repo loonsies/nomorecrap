@@ -76,6 +76,7 @@ function findQuantity(item_id)
 end
 
 local function scanInventory()
+    inv = {}
     local ids = {}
     local items = AshitaCore:GetMemoryManager():GetInventory()
     for ind = 1, items:GetContainerCountMax(0) do
