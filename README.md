@@ -2,7 +2,8 @@
 
 A simple Ashita v4 addon meant to queue useable items (like silt pouches) and commands
 
-![image](https://github.com/user-attachments/assets/74443bad-e1dd-4f05-abf3-16005f41de43)
+![pol_MCrsxQDbKc](https://github.com/user-attachments/assets/a69c7b74-e795-44bf-bc94-15431802f8a1)
+![pol_ohA73jXc3m](https://github.com/user-attachments/assets/efcacaa9-0fff-469f-be94-e2d53f921212)
 
 ## Commands
 `/nmc` Toggles the UI
