@@ -36,6 +36,8 @@ local nmc = {
 local quantityInput = { 1 }
 local intervalInput = { 2.5 }
 local commandInput = { "" }
+local eta = 0
+local lastUpdateTime = os.clock()
 queue = {}
 
 local function getItemName(id)
@@ -117,12 +119,8 @@ local function drawUI()
         if imgui.BeginTabBar("##TabBar") then
             if imgui.BeginTabItem("Item") then
                 if #queue > 0 then
-                    local totalTime = 0.0
-                    for _, entry in ipairs(queue) do
-                        totalTime = totalTime + (entry.interval or 0)
-                    end
-                    local mins = math.floor(totalTime / 60)
-                    local secs = math.floor(totalTime % 60)
+                    local mins = math.floor(eta / 60)
+                    local secs = math.floor(eta % 60)
                     imgui.Text(string.format("%d tasks queued - est. %d:%02d", #queue, mins, secs))
                 else
                     imgui.Text("No tasks queued")
@@ -197,6 +195,7 @@ local function drawUI()
                                 }
                                 task.enqueue(entry)
                             end
+                            eta = (eta or 0) + (quantityInput[1] * intervalInput[1])
                         else
                             print(chat.header(addon.name):append(chat.error("Argument error. Aborting")))
                         end
@@ -206,6 +205,7 @@ local function drawUI()
 
                 if imgui.Button("Stop") then
                     task.clear()
+                    eta = 0
                 end
                 imgui.SameLine()
 
@@ -233,12 +233,8 @@ local function drawUI()
 
             if imgui.BeginTabItem("Command") then
                 if #queue > 0 then
-                    local totalTime = 0.0
-                    for _, entry in ipairs(queue) do
-                        totalTime = totalTime + (entry.interval or 0)
-                    end
-                    local mins = math.floor(totalTime / 60)
-                    local secs = math.floor(totalTime % 60)
+                    local mins = math.floor(eta / 60)
+                    local secs = math.floor(eta % 60)
                     imgui.Text(string.format("%d tasks queued - est. %d:%02d", #queue, mins, secs))
                 else
                     imgui.Text("No tasks queued")
@@ -249,22 +245,66 @@ local function drawUI()
 
                 if imgui.Button("Start") then
                     if commandInput[1] ~= nil and commandInput[1][1] == "/" then
-                        for i = 1, quantityInput[1] do
-                            entry = {
-                                interval = intervalInput[1],
-                                type = taskTypes.command,
-                                command = commandInput[1]
-                            }
-                            task.enqueue(entry)
+                        local commandQueue = {}
+                        local commands = string.split(commandInput[1], ";")
+                    
+                        for i = 1, #commands do
+                            local trimmed = commands[i]:match("^%s*(.-)%s*$")
+                            local waitCmd, waitArg = trimmed:match("^(%/wait)%s+(%d+)$")
+                        
+                            if waitCmd and waitArg then
+                                local waitValue = tonumber(waitArg)
+                                table.insert(commandQueue, {
+                                    type = taskTypes.wait,
+                                    interval = waitValue
+                                })
+                            else
+                                table.insert(commandQueue, {
+                                    type = taskTypes.command,
+                                    command = trimmed,
+                                    interval = 0
+                                })
+                            end
                         end
-                    else
+                    
+                        -- Calculate time for one batch
+                        local batchTime = 0.0
+                        for i = 1, #commandQueue do
+                            batchTime = batchTime + (commandQueue[i].interval or 0)
+                        end
+                    
+                        if #commandQueue > 0 then
+                            local last = commandQueue[#commandQueue]
+                            if last.type == taskTypes.command then
+                                last.interval = intervalInput[1]
+                            elseif last.type == taskTypes.wait then
+                                last.interval = last.interval + intervalInput[1]
+                            end
+                            batchTime = batchTime + intervalInput[1]
+                        end
+                    
+                        local batchCount = quantityInput[1]
+                        eta = (eta or 0) + (batchTime * batchCount)
+    
+                        for i = 1, batchCount do
+                            for j = 1, #commandQueue do
+                                local entry = {}
+                                for k, v in pairs(commandQueue[j]) do
+                                    entry[k] = v
+                                end
+                                task.enqueue(entry)
+                            end
+                        end
+                    else    
                         print(chat.header(addon.name):append(chat.error("Argument error. Aborting")))
                     end
                 end
+
                 imgui.SameLine()
 
                 if imgui.Button("Stop") then
                     task.clear()
+                    eta = 0
                 end
                 imgui.SameLine()
 
@@ -291,6 +331,16 @@ local function drawUI()
             end
             imgui.EndTabBar()
         end
+    end
+end
+
+local function updateETA()
+    local now = os.clock()
+    local deltaTime = now - lastUpdateTime
+    lastUpdateTime = now
+
+    if eta > 0 then
+        eta = math.max(0, eta - deltaTime)
     end
 end
 
@@ -330,6 +380,7 @@ ashita.events.register("command", "command_cb", function(cmd, nType)
 end)
 
 ashita.events.register("d3d_present", "d3d_present_cb", function()
+    updateETA()
     updateUI()
 end)
 
