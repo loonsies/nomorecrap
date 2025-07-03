@@ -19,7 +19,7 @@ local searchStatus = {
     [0] = 'No results found',
     [1] = 'Found'
 
- }
+}
 local inv = {}
 local nmc = {
     visible = { false },
@@ -31,8 +31,8 @@ local nmc = {
         selectedItem = nil,
         previousSelectedItem = nil,
         startup = true
-     }
- }
+    }
+}
 local quantityInput = { 1 }
 local intervalInput = { 2.5 }
 local commandInput = { '' }
@@ -195,7 +195,7 @@ local function drawUI()
                                     name = currentItem.Name[1],
                                     interval = intervalInput[1],
                                     type = taskTypes.item
-                                 }
+                                }
                                 task.enqueue(entry)
                             end
                             eta = (eta or 0) + (quantityInput[1] * intervalInput[1])
@@ -260,13 +260,13 @@ local function drawUI()
                                 table.insert(commandQueue, {
                                     type = taskTypes.wait,
                                     interval = waitValue
-                                 })
+                                })
                             else
                                 table.insert(commandQueue, {
                                     type = taskTypes.command,
                                     command = trimmed,
                                     interval = 0
-                                 })
+                                })
                             end
                         end
 
@@ -357,6 +357,7 @@ local function updateUI()
 
     if currentInput ~= previousInput or nmc.search.startup then
         nmc.search.results = {}
+        nmc.search.startup = false
         search()
         nmc.search.previousInput = { currentInput }
     end
