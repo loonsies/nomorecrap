@@ -33,6 +33,7 @@ local nmc = {
         startup = true
     }
 }
+local minSize = { 675, 200 }
 local quantityInput = { 1 }
 local intervalInput = { 2.5 }
 local commandInput = { '' }
@@ -117,7 +118,8 @@ local function search()
 end
 
 local function drawUI()
-    if imgui.Begin('nomorecrap', nmc.visible, ImGuiWindowFlags_AlwaysAutoResize) then
+    imgui.SetNextWindowSizeConstraints(minSize, { FLT_MAX, FLT_MAX })
+    if imgui.Begin('nomorecrap', nmc.visible) then
         if imgui.BeginTabBar('##TabBar') then
             if imgui.BeginTabItem('Item') then
                 if #queue > 0 then
@@ -127,7 +129,7 @@ local function drawUI()
                 else
                     imgui.Text('No tasks queued')
                 end
-                imgui.NewLine()
+                imgui.Separator()
 
                 imgui.Text('Search (' .. #nmc.search.results .. ')')
                 imgui.SetNextItemWidth(-1)
@@ -135,6 +137,8 @@ local function drawUI()
 
                 if imgui.BeginTable('##SearchResultsTableChild', 2, bit.bor(ImGuiTableFlags_ScrollY), { 0, 150 }) then
                     imgui.TableSetupColumn('##ItemColumn', ImGuiTableColumnFlags_WidthStretch)
+                    imgui.TableSetupColumn("##Action", ImGuiTableColumnFlags_WidthFixed)
+
                     if nmc.search.status == searchStatus.found then
                         local clipper = ImGuiListClipper.new()
                         clipper:Begin(#nmc.search.results, -1)
@@ -242,6 +246,7 @@ local function drawUI()
                 else
                     imgui.Text('No tasks queued')
                 end
+                imgui.Separator()
 
                 imgui.SetNextItemWidth(-1)
                 imgui.InputText('##CommandInput', commandInput, 256)
