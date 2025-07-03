@@ -339,6 +339,7 @@ local function drawUI()
             end
             imgui.EndTabBar()
         end
+        imgui.End()
     end
 end
 
