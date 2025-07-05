@@ -383,7 +383,7 @@ end
 
 function handleCommand(args)
     local command = string.lower(args[1])
-    if command == '/nmc' then
+    if command == '/nomorecrap' or command == '/nmc' then
         nmc.visible[1] = not nmc.visible[1]
     end
 end
