@@ -135,46 +135,52 @@ local function drawUI()
                 imgui.SetNextItemWidth(-1)
                 imgui.InputText('##SearchInput', nmc.search.input, 48)
 
-                if imgui.BeginTable('##SearchResultsTableChild', 2, bit.bor(ImGuiTableFlags_ScrollY), { 0, 150 }) then
-                    imgui.TableSetupColumn('##ItemColumn', ImGuiTableColumnFlags_WidthStretch)
-                    imgui.TableSetupColumn("##Action", ImGuiTableColumnFlags_WidthFixed)
+                local availX, availY = imgui.GetContentRegionAvail()
+                local buttonsHeight = 30
 
-                    if nmc.search.status == searchStatus.found then
-                        local clipper = ImGuiListClipper.new()
-                        clipper:Begin(#nmc.search.results, -1)
+                if imgui.BeginChild('##SearchChild', { availX, availY - buttonsHeight }) then
+                    if imgui.BeginTable('##SearchResultsTableChild', 2, bit.bor(ImGuiTableFlags_ScrollY)) then
+                        imgui.TableSetupColumn('##ItemColumn', ImGuiTableColumnFlags_WidthStretch)
+                        imgui.TableSetupColumn("##Action", ImGuiTableColumnFlags_WidthFixed)
 
-                        while clipper:Step() do
-                            for i = clipper.DisplayStart, clipper.DisplayEnd - 1 do
-                                local itemId = nmc.search.results[i + 1]
-                                local itemName = getItemName(itemId)
-                                local ownedQty = findQuantity(itemId)
-                                local isSelected = (nmc.search.selectedItem == itemId)
+                        if nmc.search.status == searchStatus.found then
+                            local clipper = ImGuiListClipper.new()
+                            clipper:Begin(#nmc.search.results, -1)
 
-                                imgui.PushID(itemId)
-                                imgui.TableNextRow()
+                            while clipper:Step() do
+                                for i = clipper.DisplayStart, clipper.DisplayEnd - 1 do
+                                    local itemId = nmc.search.results[i + 1]
+                                    local itemName = getItemName(itemId)
+                                    local ownedQty = findQuantity(itemId)
+                                    local isSelected = (nmc.search.selectedItem == itemId)
 
-                                imgui.TableSetColumnIndex(0)
-                                if imgui.Selectable(string.format('%s (%d)', itemName, ownedQty), isSelected) then
-                                    nmc.search.selectedItem = itemId
+                                    imgui.PushID(itemId)
+                                    imgui.TableNextRow()
+
+                                    imgui.TableSetColumnIndex(0)
+                                    if imgui.Selectable(string.format('%s (%d)', itemName, ownedQty), isSelected) then
+                                        nmc.search.selectedItem = itemId
+                                    end
+
+                                    imgui.TableSetColumnIndex(1)
+                                    if imgui.Button('Max') then
+                                        quantityInput[1] = ownedQty
+                                        nmc.search.selectedItem = itemId
+                                    end
+
+                                    imgui.PopID()
                                 end
-
-                                imgui.TableSetColumnIndex(1)
-                                if imgui.Button('Max') then
-                                    quantityInput[1] = ownedQty
-                                    nmc.search.selectedItem = itemId
-                                end
-
-                                imgui.PopID()
                             end
-                        end
 
-                        clipper:End()
-                    else
-                        imgui.TableNextRow()
-                        imgui.TableSetColumnIndex(0)
-                        imgui.Text(searchStatus[nmc.search.status])
+                            clipper:End()
+                        else
+                            imgui.TableNextRow()
+                            imgui.TableSetColumnIndex(0)
+                            imgui.Text(searchStatus[nmc.search.status])
+                        end
+                        imgui.EndTable()
                     end
-                    imgui.EndTable()
+                    imgui.EndChild()
                 end
 
                 if imgui.Button('Refresh') then
