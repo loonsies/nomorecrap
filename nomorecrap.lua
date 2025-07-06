@@ -389,6 +389,10 @@ function handleCommand(args)
     end
 end
 
+ashita.events.register('load', 'load_cb', function()
+    scanInventory()
+end)
+
 ashita.events.register('command', 'command_cb', function(cmd, nType)
     local args = cmd.command:args()
     if #args ~= 0 then
@@ -415,5 +419,3 @@ ashita.events.register('d3d_present', 'd3d_present_cb', function()
     updateETA()
     updateUI()
 end)
-
-scanInventory()
