@@ -32,7 +32,8 @@ local nmc = {
         previousSelectedItem = nil,
         startup = true
     },
-    zoning = false
+    zoning = false,
+    loggedIn = false
 }
 local minSize = { 675, 200 }
 local quantityInput = { 1 }
