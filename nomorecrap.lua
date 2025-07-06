@@ -52,9 +52,14 @@ end
 
 function hasQuantity(item_id, item_count)
     local count = 0
-    local items = AshitaCore:GetMemoryManager():GetInventory()
-    for ind = 1, items:GetContainerCountMax(0) do
-        local item = items:GetContainerItem(0, ind)
+    local inventory = AshitaCore:GetMemoryManager():GetInventory()
+
+    if not inventory then
+        return false
+    end
+
+    for ind = 1, inventory:GetContainerCountMax(0) do
+        local item = inventory:GetContainerItem(0, ind)
         if item ~= nil and item.Id == item_id and item.Flags == 0 then
             count = count + item.Count
         end
@@ -69,9 +74,14 @@ end
 
 function findQuantity(item_id)
     local count = 0
-    local items = AshitaCore:GetMemoryManager():GetInventory()
-    for ind = 1, items:GetContainerCountMax(0) do
-        local item = items:GetContainerItem(0, ind)
+    local inventory = AshitaCore:GetMemoryManager():GetInventory()
+
+    if not inventory then
+        return -1
+    end
+
+    for ind = 1, inventory:GetContainerCountMax(0) do
+        local item = inventory:GetContainerItem(0, ind)
         if item ~= nil and item.Id == item_id then
             count = count + item.Count
         end
@@ -82,9 +92,14 @@ end
 local function scanInventory()
     inv = {}
     local ids = {}
-    local items = AshitaCore:GetMemoryManager():GetInventory()
-    for ind = 1, items:GetContainerCountMax(0) do
-        local invItem = items:GetContainerItem(0, ind)
+    local inventory = AshitaCore:GetMemoryManager():GetInventory()
+
+    if not inventory then
+        return nil
+    end
+
+    for ind = 1, inventory:GetContainerCountMax(0) do
+        local invItem = inventory:GetContainerItem(0, ind)
         if invItem ~= nil then
             local item = getItemById(invItem.Id)
             if item ~= nil and ids[item.Id] == nil then
@@ -96,7 +111,6 @@ local function scanInventory()
             end
         end
     end
-    return nil
 end
 
 local function search()
@@ -186,6 +200,7 @@ local function drawUI()
 
                 if imgui.Button('Refresh') then
                     scanInventory()
+                    search()
                 end
                 imgui.SameLine()
 
@@ -391,6 +406,7 @@ end
 
 ashita.events.register('load', 'load_cb', function()
     scanInventory()
+    search()
 end)
 
 ashita.events.register('command', 'command_cb', function(cmd, nType)
@@ -402,18 +418,31 @@ end)
 
 ashita.events.register('packet_in', 'packet_in_cb', function(e)
     if e.id == 0x000A then
+        if not nmc.loggedIn then
+            local serverId = struct.unpack('L', e.data, 0x04 + 0x01)
+            nmc.loggedIn = serverId ~= 0
+
+            if nmc.loggedIn then
+                scanInventory()
+                search()
+            end
+        end
+
         if nmc.zoning then
             nmc.visible[1] = true
             nmc.zoning = false
         end
     elseif e.id == 0x000B then
+        if (struct.unpack('b', e.data, 0x04 + 0x01) == 1 and nmc.loggedIn) then
+            nmc.loggedIn = false
+        end
+
         if nmc.visible[1] then
             nmc.visible[1] = false
             nmc.zoning = true
         end
     end
 end)
-
 
 ashita.events.register('d3d_present', 'd3d_present_cb', function()
     updateETA()
