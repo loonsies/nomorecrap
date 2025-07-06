@@ -31,7 +31,8 @@ local nmc = {
         selectedItem = nil,
         previousSelectedItem = nil,
         startup = true
-    }
+    },
+    zoning = false
 }
 local minSize = { 675, 200 }
 local quantityInput = { 1 }
@@ -394,6 +395,21 @@ ashita.events.register('command', 'command_cb', function(cmd, nType)
         handleCommand(args)
     end
 end)
+
+ashita.events.register('packet_in', 'packet_in_cb', function(e)
+    if e.id == 0x000A then
+        if nmc.zoning then
+            nmc.visible[1] = true
+            nmc.zoning = false
+        end
+    elseif e.id == 0x000B then
+        if nmc.visible[1] then
+            nmc.visible[1] = false
+            nmc.zoning = true
+        end
+    end
+end)
+
 
 ashita.events.register('d3d_present', 'd3d_present_cb', function()
     updateETA()
