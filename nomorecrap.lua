@@ -13,14 +13,8 @@ local imgui = require('imgui')
 -- Local dependencies
 local task = require('src/task')
 local taskTypes = require('data/taskTypes')
+local searchStatus = require('data/searchStatus')
 
-local searchStatus = {
-    noResults = 0,
-    found = 1,
-    [0] = 'No results found',
-    [1] = 'Found'
-
-}
 local inv = {}
 local nmc = {
     visible = { false },
@@ -368,12 +362,8 @@ local function drawUI()
 end
 
 local function updateETA()
-    local now = os.clock()
-    local deltaTime = now - nmc.lastUpdateTime
-    nmc.lastUpdateTime = now
-
     if nmc.eta > 0 then
-        nmc.eta = math.max(0, nmc.eta - deltaTime)
+        nmc.eta = math.max(0, nmc.eta - 1)
     end
 end
 
@@ -447,6 +437,12 @@ ashita.events.register('packet_in', 'packet_in_cb', function(e)
 end)
 
 ashita.events.register('d3d_present', 'd3d_present_cb', function()
-    updateETA()
+    local now = os.clock()
+
+    if nmc.visible[1] and now - nmc.lastUpdateTime >= 1 then
+        updateETA()
+        scanInventory()
+        nmc.lastUpdateTime = now
+    end
     updateUI()
 end)
