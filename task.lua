@@ -1,4 +1,5 @@
-task = {}
+local task = {}
+
 local throttle_timer = 0
 
 taskTypes = {
