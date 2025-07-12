@@ -1,12 +1,10 @@
 local task = {}
+local taskTypes = require('data/taskTypes')
 
+local queue = {}
 local throttle_timer = 0
 
-taskTypes = {
-    item = 1,
-    command = 2,
-    wait = 3,
-}
+
 
 local function handleEntry(entry)
     if entry.type == taskTypes.item then
@@ -41,6 +39,10 @@ function task.enqueue(entry)
     else
         queue[queueCount + 1] = entry
     end
+end
+
+function task.getQueue()
+    return queue
 end
 
 ashita.events.register("packet_out", "packet_out_cb", function(e)

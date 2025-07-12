@@ -6,12 +6,13 @@ addon.link = 'https://github.com/loonsies/nomorecrap'
 
 -- Ashita dependencies
 require 'common'
-settings = require('settings')
-chat = require('chat')
-imgui = require('imgui')
+local settings = require('settings')
+local chat = require('chat')
+local imgui = require('imgui')
 
 -- Local dependencies
-task = require('task')
+local task = require('src/task')
+local taskTypes = require('data/taskTypes')
 
 local searchStatus = {
     noResults = 0,
@@ -33,15 +34,15 @@ local nmc = {
         startup = true
     },
     zoning = false,
-    loggedIn = false
+    loggedIn = false,
+    minSize = { 675, 200 },
+    quantityInput = { 1 },
+    intervalInput = { 2.5 },
+    commandInput = { '' },
+    eta = 0,
+    lastUpdateTime = os.clock(),
 }
-local minSize = { 675, 200 }
-local quantityInput = { 1 }
-local intervalInput = { 2.5 }
-local commandInput = { '' }
-local eta = 0
-local lastUpdateTime = os.clock()
-queue = {}
+
 
 local function getItemName(id)
     return AshitaCore:GetResourceManager():GetItemById(tonumber(id)).Name[1]
@@ -134,14 +135,14 @@ local function search()
 end
 
 local function drawUI()
-    imgui.SetNextWindowSizeConstraints(minSize, { FLT_MAX, FLT_MAX })
+    imgui.SetNextWindowSizeConstraints(nmc.minSize, { FLT_MAX, FLT_MAX })
     if imgui.Begin('nomorecrap', nmc.visible) then
         if imgui.BeginTabBar('##TabBar') then
             if imgui.BeginTabItem('Item') then
-                if #queue > 0 then
-                    local mins = math.floor(eta / 60)
-                    local secs = math.floor(eta % 60)
-                    imgui.Text(string.format('%d tasks queued - est. %d:%02d', #queue, mins, secs))
+                if #task.getQueue() > 0 then
+                    local mins = math.floor(nmc.eta / 60)
+                    local secs = math.floor(nmc.eta % 60)
+                    imgui.Text(string.format('%d tasks queued - est. %d:%02d', #task.getQueue(), mins, secs))
                 else
                     imgui.Text('No tasks queued')
                 end
@@ -180,7 +181,7 @@ local function drawUI()
 
                                     imgui.TableSetColumnIndex(1)
                                     if imgui.Button('Max') then
-                                        quantityInput[1] = ownedQty
+                                        nmc.quantityInput[1] = ownedQty
                                         nmc.search.selectedItem = itemId
                                     end
 
@@ -209,23 +210,23 @@ local function drawUI()
                     if nmc.search.selectedItem ~= nil then
                         local currentItem = getItemById(nmc.search.selectedItem)
                         local ownedQuantity = findQuantity(nmc.search.selectedItem)
-                        if quantityInput[1] > ownedQuantity then
+                        if nmc.quantityInput[1] > ownedQuantity then
                             print(chat.header(addon.name):append(chat.error(
                                 'Quantity set superior to owned quantity. Aborting')))
                             return
                         end
-                        if currentItem and quantityInput[1] >= 1 and intervalInput[1] >= 0.5 and
-                            hasQuantity(currentItem.Id, quantityInput[1]) then
-                            for i = 1, quantityInput[1] do
+                        if currentItem and nmc.quantityInput[1] >= 1 and nmc.intervalInput[1] >= 0.5 and
+                            hasQuantity(currentItem.Id, nmc.quantityInput[1]) then
+                            for i = 1, nmc.quantityInput[1] do
                                 entry = {
                                     id = currentItem.Id,
                                     name = currentItem.Name[1],
-                                    interval = intervalInput[1],
+                                    interval = nmc.intervalInput[1],
                                     type = taskTypes.item
                                 }
                                 task.enqueue(entry)
                             end
-                            eta = (eta or 0) + (quantityInput[1] * intervalInput[1])
+                            nmc.eta = (nmc.eta or 0) + (nmc.quantityInput[1] * nmc.intervalInput[1])
                         else
                             print(chat.header(addon.name):append(chat.error('Argument error. Aborting')))
                         end
@@ -235,16 +236,16 @@ local function drawUI()
 
                 if imgui.Button('Stop') then
                     task.clear()
-                    eta = 0
+                    nmc.eta = 0
                 end
                 imgui.SameLine()
 
                 imgui.Text('Quantity')
                 imgui.SameLine()
                 imgui.SetNextItemWidth(150)
-                if imgui.InputInt('##QuantityInputInt', quantityInput) then
-                    if quantityInput[1] < 1 then
-                        quantityInput = { 1 }
+                if imgui.InputInt('##QuantityInputInt', nmc.quantityInput) then
+                    if nmc.quantityInput[1] < 1 then
+                        nmc.quantityInput = { 1 }
                     end
                 end
                 imgui.SameLine()
@@ -252,9 +253,9 @@ local function drawUI()
                 imgui.Text('Interval')
                 imgui.SameLine()
                 imgui.SetNextItemWidth(150)
-                if imgui.InputFloat('##IntervalInputFloat', intervalInput, 0.5, 0.1) then
-                    if intervalInput[1] < 0.5 then
-                        intervalInput = { 0.5 }
+                if imgui.InputFloat('##IntervalInputFloat', nmc.intervalInput, 0.5, 0.1) then
+                    if nmc.intervalInput[1] < 0.5 then
+                        nmc.intervalInput = { 0.5 }
                     end
                 end
 
@@ -262,22 +263,22 @@ local function drawUI()
             end
 
             if imgui.BeginTabItem('Command') then
-                if #queue > 0 then
-                    local mins = math.floor(eta / 60)
-                    local secs = math.floor(eta % 60)
-                    imgui.Text(string.format('%d tasks queued - est. %d:%02d', #queue, mins, secs))
+                if #task.getQueue() > 0 then
+                    local mins = math.floor(nmc.eta / 60)
+                    local secs = math.floor(nmc.eta % 60)
+                    imgui.Text(string.format('%d tasks queued - est. %d:%02d', #task.getQueue(), mins, secs))
                 else
                     imgui.Text('No tasks queued')
                 end
                 imgui.Separator()
 
                 imgui.SetNextItemWidth(-1)
-                imgui.InputText('##CommandInput', commandInput, 256)
+                imgui.InputText('##CommandInput', nmc.commandInput, 256)
 
                 if imgui.Button('Start') then
-                    if commandInput[1] ~= nil and commandInput[1][1] == '/' then
+                    if nmc.commandInput[1] ~= nil and nmc.commandInput[1][1] == '/' then
                         local commandQueue = {}
-                        local commands = string.split(commandInput[1], ';')
+                        local commands = string.split(nmc.commandInput[1], ';')
 
                         for i = 1, #commands do
                             local trimmed = commands[i]:match('^%s*(.-)%s*$')
@@ -307,15 +308,15 @@ local function drawUI()
                         if #commandQueue > 0 then
                             local last = commandQueue[#commandQueue]
                             if last.type == taskTypes.command then
-                                last.interval = intervalInput[1]
+                                last.interval = nmc.intervalInput[1]
                             elseif last.type == taskTypes.wait then
-                                last.interval = last.interval + intervalInput[1]
+                                last.interval = last.interval + nmc.intervalInput[1]
                             end
-                            batchTime = batchTime + intervalInput[1]
+                            batchTime = batchTime + nmc.intervalInput[1]
                         end
 
-                        local batchCount = quantityInput[1]
-                        eta = (eta or 0) + (batchTime * batchCount)
+                        local batchCount = nmc.quantityInput[1]
+                        nmc.eta = (nmc.eta or 0) + (batchTime * batchCount)
 
                         for i = 1, batchCount do
                             for j = 1, #commandQueue do
@@ -335,16 +336,16 @@ local function drawUI()
 
                 if imgui.Button('Stop') then
                     task.clear()
-                    eta = 0
+                    nmc.eta = 0
                 end
                 imgui.SameLine()
 
                 imgui.Text('Quantity')
                 imgui.SameLine()
                 imgui.SetNextItemWidth(150)
-                if imgui.InputInt('##QuantityInputInt', quantityInput) then
-                    if quantityInput[1] < 1 then
-                        quantityInput = { 1 }
+                if imgui.InputInt('##QuantityInputInt', nmc.quantityInput) then
+                    if nmc.quantityInput[1] < 1 then
+                        nmc.quantityInput = { 1 }
                     end
                 end
                 imgui.SameLine()
@@ -352,9 +353,9 @@ local function drawUI()
                 imgui.Text('Interval')
                 imgui.SameLine()
                 imgui.SetNextItemWidth(150)
-                if imgui.InputFloat('##IntervalInputFloat', intervalInput, 0.5, 0.1) then
-                    if intervalInput[1] < 0.5 then
-                        intervalInput = { 0.5 }
+                if imgui.InputFloat('##IntervalInputFloat', nmc.intervalInput, 0.5, 0.1) then
+                    if nmc.intervalInput[1] < 0.5 then
+                        nmc.intervalInput = { 0.5 }
                     end
                 end
 
@@ -368,11 +369,11 @@ end
 
 local function updateETA()
     local now = os.clock()
-    local deltaTime = now - lastUpdateTime
-    lastUpdateTime = now
+    local deltaTime = now - nmc.lastUpdateTime
+    nmc.lastUpdateTime = now
 
-    if eta > 0 then
-        eta = math.max(0, eta - deltaTime)
+    if nmc.eta > 0 then
+        nmc.eta = math.max(0, nmc.eta - deltaTime)
     end
 end
 
