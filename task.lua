@@ -29,6 +29,7 @@ local function handleQueue()
 end
 
 function task.clear()
+    throttle_timer = 0
     queue = {}
 end
 
