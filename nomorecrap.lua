@@ -16,7 +16,7 @@ local taskTypes = require('data/taskTypes')
 local searchStatus = require('data/searchStatus')
 
 local inv = {}
-local nmc = {
+nmc = {
     visible = { false },
     search = {
         results = {},
@@ -230,7 +230,6 @@ local function drawUI()
 
                 if imgui.Button('Stop') then
                     task.clear()
-                    nmc.eta = 0
                 end
                 imgui.SameLine()
 

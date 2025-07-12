@@ -4,8 +4,6 @@ local taskTypes = require('data/taskTypes')
 local queue = {}
 local throttle_timer = 0
 
-
-
 local function handleEntry(entry)
     if entry.type == taskTypes.item then
         AshitaCore:GetChatManager():QueueCommand(-1, '/item "' .. entry.name .. '" <me>')
@@ -30,6 +28,7 @@ end
 function task.clear()
     throttle_timer = 0
     queue = {}
+    nmc.eta = 0
 end
 
 function task.enqueue(entry)
