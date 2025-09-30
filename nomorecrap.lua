@@ -1,5 +1,5 @@
 addon.name = 'nomorecrap'
-addon.version = "0.7"
+addon.version = '0.7'
 addon.author = 'looney'
 addon.desc = 'nomorecrap!!!'
 addon.link = 'https://github.com/loonsies/nomorecrap'
@@ -14,6 +14,7 @@ local imgui = require('imgui')
 local task = require('src/task')
 local taskTypes = require('data/taskTypes')
 local searchStatus = require('data/searchStatus')
+local config = require('src/config')
 
 local inv = {}
 nmc = {
@@ -30,23 +31,29 @@ nmc = {
     zoning = false,
     loggedIn = false,
     minSize = { 675, 200 },
+    minModalSize = { 450, 0 },
     quantityInput = { 1 },
     intervalInput = { 2.5 },
     commandInput = { '' },
+    selectedCommandPreset = nil,
     eta = 0,
     lastUpdateTime = os.clock(),
 }
 
 
 local function getItemName(id)
-    return AshitaCore:GetResourceManager():GetItemById(tonumber(id)).Name[1]
+    local item = AshitaCore:GetResourceManager():GetItemById(tonumber(id))
+    if item ~= nil then
+        return item.Name[1]
+    end
+    return ''
 end
 
 function getItemById(id)
     return AshitaCore:GetResourceManager():GetItemById(tonumber(id))
 end
 
-function hasQuantity(item_id, item_count)
+local function hasQuantity(itemId, itemCount)
     local count = 0
     local inventory = AshitaCore:GetMemoryManager():GetInventory()
 
@@ -56,19 +63,15 @@ function hasQuantity(item_id, item_count)
 
     for ind = 1, inventory:GetContainerCountMax(0) do
         local item = inventory:GetContainerItem(0, ind)
-        if item ~= nil and item.Id == item_id and item.Flags == 0 then
+        if item ~= nil and item.Id == itemId and item.Flags == 0 then
             count = count + item.Count
         end
     end
 
-    if count >= item_count then
-        return true
-    else
-        return false
-    end
+    return count >= itemCount
 end
 
-function findQuantity(item_id)
+local function findQuantity(itemId)
     local count = 0
     local inventory = AshitaCore:GetMemoryManager():GetInventory()
 
@@ -78,11 +81,368 @@ function findQuantity(item_id)
 
     for ind = 1, inventory:GetContainerCountMax(0) do
         local item = inventory:GetContainerItem(0, ind)
-        if item ~= nil and item.Id == item_id then
+        if item ~= nil and item.Id == itemId then
             count = count + item.Count
         end
     end
+
     return count
+end
+
+local function getCommandPresets()
+    if nmc.config == nil then
+        nmc.config = {}
+    end
+    if nmc.config.commandPresets == nil then
+        nmc.config.commandPresets = {}
+    end
+    return nmc.config.commandPresets
+end
+
+
+local commandPresetModal = {
+    visible = false,
+    missingCommand = false,
+    missingName = false,
+    confirmingOverwrite = false,
+    input = {},
+    targetIndex = nil,
+    pendingIndex = nil,
+    pendingData = nil,
+    pendingFromSelection = false
+}
+local deleteCommandModal = {
+    visible = false,
+    targetIndex = nil
+}
+
+local function applyCommandPreset(index)
+    local presets = getCommandPresets()
+    local preset = presets[index]
+    if not preset then
+        return
+    end
+
+    if type(preset.command) == 'string' then
+        nmc.commandInput[1] = preset.command
+    else
+        nmc.commandInput[1] = ''
+    end
+
+    local quantity = tonumber(preset.quantity) or 1
+    if quantity < 1 then
+        quantity = 1
+    end
+    nmc.quantityInput[1] = quantity
+
+    local interval = tonumber(preset.interval) or nmc.intervalInput[1]
+    if interval < 0.5 then
+        interval = 0.5
+    end
+    nmc.intervalInput[1] = interval
+end
+
+local function formatInterval(value)
+    return string.format('%.2f', tonumber(value) or 0)
+end
+
+local function drawCommandPresetList()
+    imgui.Text('Saved commands')
+
+    local presets = getCommandPresets()
+    local availX, _ = imgui.GetContentRegionAvail()
+    if imgui.BeginChild('##CommandPresetList', { availX, 150 }, true) then
+        if #presets > 0 then
+            if imgui.BeginTable('##CommandPresetTable', 3, ImGuiTableFlags_ScrollY) then
+                imgui.TableSetupColumn('Name', ImGuiTableColumnFlags_WidthStretch)
+                imgui.TableSetupColumn('Quantity', ImGuiTableColumnFlags_WidthFixed)
+                imgui.TableSetupColumn('Delay', ImGuiTableColumnFlags_WidthFixed)
+                imgui.TableHeadersRow()
+
+                for i = 1, #presets do
+                    local preset = presets[i]
+                    imgui.TableNextRow()
+
+                    imgui.TableSetColumnIndex(0)
+                    local label = string.format('%s##CommandPreset%d', preset.name or '<unnamed>', i)
+                    local isSelected = (nmc.selectedCommandPreset == i)
+                    local clicked = imgui.Selectable(label, isSelected, ImGuiSelectableFlags_AllowDoubleClick)
+                    if clicked then
+                        local doubleClicked = imgui.IsMouseDoubleClicked(ImGuiMouseButton_Left)
+                        if doubleClicked then
+                            nmc.selectedCommandPreset = i
+                            applyCommandPreset(i)
+                        elseif isSelected then
+                            nmc.selectedCommandPreset = nil
+                        else
+                            nmc.selectedCommandPreset = i
+                        end
+                    end
+                    if preset.command and imgui.IsItemHovered() then
+                        imgui.SetTooltip(preset.command)
+                    end
+
+                    imgui.TableSetColumnIndex(1)
+                    imgui.Text(tostring(preset.quantity or 0))
+
+                    imgui.TableSetColumnIndex(2)
+                    imgui.Text(formatInterval(preset.interval))
+                end
+
+                imgui.EndTable()
+            end
+        else
+            imgui.TextDisabled('No saved commands')
+        end
+        imgui.EndChild()
+    end
+
+    if imgui.Button('Load selected') then
+        if nmc.selectedCommandPreset ~= nil then
+            applyCommandPreset(nmc.selectedCommandPreset)
+        end
+    end
+    imgui.SameLine()
+
+    local commandText = nmc.commandInput[1] or ''
+    if imgui.Button('Save current') then
+        if commandText:match('%S') ~= nil then
+            commandPresetModal.visible = true
+            commandPresetModal.missingCommand = false
+            commandPresetModal.missingName = false
+            commandPresetModal.confirmingOverwrite = false
+            commandPresetModal.pendingIndex = nil
+            commandPresetModal.pendingData = nil
+            commandPresetModal.pendingFromSelection = false
+            commandPresetModal.targetIndex = nmc.selectedCommandPreset
+            if nmc.selectedCommandPreset ~= nil and presets[nmc.selectedCommandPreset] ~= nil then
+                commandPresetModal.input = { presets[nmc.selectedCommandPreset].name or '' }
+            else
+                commandPresetModal.input = { '' }
+            end
+        else
+            print(chat.header(addon.name):append(chat.error('Cannot save an empty command.')))
+        end
+    end
+    imgui.SameLine()
+
+    if imgui.Button('Delete selected') then
+        if nmc.selectedCommandPreset ~= nil and presets[nmc.selectedCommandPreset] ~= nil then
+            deleteCommandModal.visible = true
+            deleteCommandModal.targetIndex = nmc.selectedCommandPreset
+        end
+    end
+
+    if nmc.selectedCommandPreset ~= nil then
+        imgui.SameLine()
+        if imgui.Button('Clear selection') then
+            nmc.selectedCommandPreset = nil
+        end
+    end
+end
+
+local function drawCommandPresetSaveModal()
+    if not commandPresetModal.visible then
+        return
+    end
+
+    imgui.SetNextWindowSize({ 0, 0 }, ImGuiCond_Always)
+    imgui.SetNextWindowSizeConstraints(nmc.minModalSize, { FLT_MAX, FLT_MAX })
+    imgui.OpenPopup('Save command preset')
+
+    if imgui.BeginPopupModal('Save command preset', nil, ImGuiWindowFlags_NoResize) then
+        if commandPresetModal.confirmingOverwrite then
+            local data = commandPresetModal.pendingData or {}
+            local name = data.name or '<unnamed>'
+
+            if commandPresetModal.pendingFromSelection then
+                imgui.Text(string.format('Overwrite the selected preset "%s" with these values?', name))
+            else
+                imgui.Text(string.format('A preset named "%s" already exists. Overwrite it with the current values?', name))
+            end
+            imgui.Separator()
+
+            if data.command and #data.command > 0 then
+                imgui.Text('Command:')
+                imgui.TextWrapped(data.command)
+                imgui.Separator()
+            end
+
+            imgui.Text(string.format('Quantity: %d', data.quantity or 0))
+            imgui.Text(string.format('Delay: %s', formatInterval(data.interval)))
+            imgui.Separator()
+
+            if imgui.Button('Overwrite', { 120, 0 }) then
+                local presets = getCommandPresets()
+                if commandPresetModal.pendingIndex ~= nil then
+                    presets[commandPresetModal.pendingIndex] = data
+                    nmc.selectedCommandPreset = commandPresetModal.pendingIndex
+                    settings.save()
+                end
+
+                commandPresetModal.visible = false
+                commandPresetModal.confirmingOverwrite = false
+                commandPresetModal.pendingIndex = nil
+                commandPresetModal.pendingData = nil
+                commandPresetModal.pendingFromSelection = false
+                commandPresetModal.missingCommand = false
+                commandPresetModal.missingName = false
+                commandPresetModal.targetIndex = nil
+                commandPresetModal.input = {}
+
+                imgui.CloseCurrentPopup()
+            end
+            imgui.SameLine()
+            if imgui.Button('Cancel', { 120, 0 }) then
+                commandPresetModal.confirmingOverwrite = false
+                commandPresetModal.pendingIndex = nil
+                commandPresetModal.pendingData = nil
+                commandPresetModal.pendingFromSelection = false
+            end
+
+            imgui.EndPopup()
+            return
+        end
+
+        imgui.Text('Enter a name for this command preset')
+        imgui.Separator()
+
+        if commandPresetModal.missingCommand then
+            imgui.PushStyleColor(ImGuiCol_Text, { 1.0, 0.0, 0.0, 1.0 })
+            imgui.Text('Command text is required before saving')
+            imgui.PopStyleColor()
+        end
+
+        if commandPresetModal.missingName then
+            imgui.PushStyleColor(ImGuiCol_Text, { 1.0, 0.0, 0.0, 1.0 })
+            imgui.Text('A name is required for the preset')
+            imgui.PopStyleColor()
+        end
+
+        imgui.SetNextItemWidth(-1)
+        if imgui.InputText('##CommandPresetNameInput', commandPresetModal.input, 64) then
+            commandPresetModal.missingName = false
+        end
+
+        if imgui.Button('OK', { 120, 0 }) then
+            local name = commandPresetModal.input[1] or ''
+            local commandText = nmc.commandInput[1] or ''
+            if commandText:match('%S') == nil then
+                commandPresetModal.missingCommand = true
+            elseif #name == 0 then
+                commandPresetModal.missingName = true
+            else
+                local presets = getCommandPresets()
+                local existingIndex = nil
+                local lowerName = string.lower(name)
+                for i = 1, #presets do
+                    if presets[i].name and string.lower(presets[i].name) == lowerName then
+                        existingIndex = i
+                        break
+                    end
+                end
+
+                local data = {
+                    name = name,
+                    command = commandText,
+                    quantity = tonumber(nmc.quantityInput[1]) or 1,
+                    interval = tonumber(nmc.intervalInput[1]) or 0.5
+                }
+
+                local targetIndex = commandPresetModal.targetIndex
+                local pendingFromSelection = targetIndex ~= nil
+
+                if existingIndex ~= nil and (targetIndex == nil or existingIndex ~= targetIndex) then
+                    targetIndex = existingIndex
+                    pendingFromSelection = false
+                end
+
+                if targetIndex ~= nil then
+                    commandPresetModal.confirmingOverwrite = true
+                    commandPresetModal.pendingIndex = targetIndex
+                    commandPresetModal.pendingData = data
+                    commandPresetModal.pendingFromSelection = pendingFromSelection
+
+                    imgui.EndPopup()
+                    return
+                else
+                    table.insert(presets, data)
+                    nmc.selectedCommandPreset = #presets
+                    settings.save()
+
+                    commandPresetModal.visible = false
+                    commandPresetModal.missingCommand = false
+                    commandPresetModal.missingName = false
+                    commandPresetModal.targetIndex = nil
+                    commandPresetModal.input = {}
+
+                    imgui.CloseCurrentPopup()
+                end
+            end
+        end
+        imgui.SameLine()
+        if imgui.Button('Cancel', { 120, 0 }) then
+            commandPresetModal.visible = false
+            commandPresetModal.missingCommand = false
+            commandPresetModal.missingName = false
+            commandPresetModal.confirmingOverwrite = false
+            commandPresetModal.pendingIndex = nil
+            commandPresetModal.pendingData = nil
+            commandPresetModal.pendingFromSelection = false
+            commandPresetModal.targetIndex = nil
+            commandPresetModal.input = {}
+            imgui.CloseCurrentPopup()
+        end
+
+        imgui.EndPopup()
+    end
+end
+
+local function drawCommandPresetDeleteModal()
+    if not deleteCommandModal.visible then
+        return
+    end
+
+    imgui.SetNextWindowSize({ 0, 0 }, ImGuiCond_Always)
+    imgui.SetNextWindowSizeConstraints(nmc.minModalSize, { FLT_MAX, FLT_MAX })
+    imgui.OpenPopup('Delete saved command')
+
+    if imgui.BeginPopupModal('Delete saved command', nil, ImGuiWindowFlags_NoResize) then
+        local presets = getCommandPresets()
+        local index = deleteCommandModal.targetIndex
+        local preset = index and presets[index] or nil
+
+        if preset then
+            imgui.Text(string.format('Are you sure you want to delete "%s"?', preset.name or '<unnamed>'))
+        else
+            imgui.Text('The selected preset could not be found.')
+        end
+
+        if imgui.Button('OK', { 120, 0 }) then
+            if preset and index then
+                table.remove(presets, index)
+                if nmc.selectedCommandPreset ~= nil then
+                    if nmc.selectedCommandPreset == index then
+                        nmc.selectedCommandPreset = nil
+                    elseif nmc.selectedCommandPreset > index then
+                        nmc.selectedCommandPreset = nmc.selectedCommandPreset - 1
+                    end
+                end
+                settings.save()
+            end
+            deleteCommandModal.visible = false
+            deleteCommandModal.targetIndex = nil
+            imgui.CloseCurrentPopup()
+        end
+        imgui.SameLine()
+        if imgui.Button('Cancel', { 120, 0 }) then
+            deleteCommandModal.visible = false
+            deleteCommandModal.targetIndex = nil
+            imgui.CloseCurrentPopup()
+        end
+
+        imgui.EndPopup()
+    end
 end
 
 local function scanInventory()
@@ -152,7 +512,7 @@ local function drawUI()
                 if imgui.BeginChild('##SearchChild', { availX, availY - buttonsHeight }) then
                     if imgui.BeginTable('##SearchResultsTableChild', 2, bit.bor(ImGuiTableFlags_ScrollY)) then
                         imgui.TableSetupColumn('##ItemColumn', ImGuiTableColumnFlags_WidthStretch)
-                        imgui.TableSetupColumn("##Action", ImGuiTableColumnFlags_WidthFixed)
+                        imgui.TableSetupColumn('##Action', ImGuiTableColumnFlags_WidthFixed)
 
                         if nmc.search.status == searchStatus.found then
                             local clipper = ImGuiListClipper.new()
@@ -267,6 +627,10 @@ local function drawUI()
 
                 imgui.SetNextItemWidth(-1)
                 imgui.InputText('##CommandInput', nmc.commandInput, 256)
+
+                drawCommandPresetList()
+                drawCommandPresetSaveModal()
+                drawCommandPresetDeleteModal()
 
                 if imgui.Button('Start') then
                     if nmc.commandInput[1] ~= nil and nmc.commandInput[1][1] == '/' then
@@ -395,19 +759,25 @@ function handleCommand(args)
     end
 end
 
-ashita.events.register('load', 'load_cb', function()
+ashita.events.register('load', 'load_cb', function ()
+    config.init(config.load())
+
+    settings.register('settings', 'settings_update_cb', function (newConfig)
+        config.init(newConfig)
+    end)
+
     scanInventory()
     search()
 end)
 
-ashita.events.register('command', 'command_cb', function(cmd, nType)
+ashita.events.register('command', 'command_cb', function (cmd, nType)
     local args = cmd.command:args()
     if #args ~= 0 then
         handleCommand(args)
     end
 end)
 
-ashita.events.register('packet_in', 'packet_in_cb', function(e)
+ashita.events.register('packet_in', 'packet_in_cb', function (e)
     if e.id == 0x000A then
         if not nmc.loggedIn then
             local serverId = struct.unpack('L', e.data, 0x04 + 0x01)
@@ -435,8 +805,10 @@ ashita.events.register('packet_in', 'packet_in_cb', function(e)
     end
 end)
 
-ashita.events.register('d3d_present', 'd3d_present_cb', function()
+ashita.events.register('d3d_present', 'd3d_present_cb', function ()
     local now = os.clock()
+
+    task.handleQueue()
 
     if nmc.visible[1] and now - nmc.lastUpdateTime >= 1 then
         updateETA()

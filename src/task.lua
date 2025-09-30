@@ -14,11 +14,11 @@ local function handleEntry(entry)
     elseif entry.type == taskTypes.wait then
         throttle_timer = os.clock() + entry.interval
     else
-        print("Unknown task type: " .. tostring(entry.type))
+        print('Unknown task type: ' .. tostring(entry.type))
     end
 end
 
-local function handleQueue()
+function task.handleQueue()
     while #queue > 0 and os.clock() > throttle_timer do
         handleEntry(queue[1])
         table.remove(queue, 1)
@@ -43,9 +43,5 @@ end
 function task.getQueue()
     return queue
 end
-
-ashita.events.register("packet_out", "packet_out_cb", function(e)
-    handleQueue()
-end)
 
 return task
