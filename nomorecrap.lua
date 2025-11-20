@@ -1,5 +1,5 @@
 addon.name = 'nomorecrap'
-addon.version = "0.7-ashita4.30"
+addon.version = "0.8"
 addon.author = 'looney'
 addon.desc = 'nomorecrap!!!'
 addon.link = 'https://github.com/loonsies/nomorecrap'
