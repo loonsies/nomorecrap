@@ -151,7 +151,7 @@ local function drawCommandPresetList()
 
     local presets = getCommandPresets()
     local availX, _ = imgui.GetContentRegionAvail()
-    if imgui.BeginChild('##CommandPresetList', { availX, 150 }, ImGuiChildFlags_Border) then
+    if imgui.BeginChild('##CommandPresetList', { availX, 150 }, ImGuiChildFlags_Borders) then
         if #presets > 0 then
             if imgui.BeginTable('##CommandPresetTable', 3, ImGuiTableFlags_ScrollY) then
                 imgui.TableSetupColumn('Name', ImGuiTableColumnFlags_WidthStretch)
