@@ -625,8 +625,7 @@ local function drawUI()
                 end
                 imgui.Separator()
 
-                imgui.SetNextItemWidth(-1)
-                imgui.InputText('##CommandInput', nmc.commandInput, 256)
+                imgui.InputTextMultiline('##CommandInput', nmc.commandInput, 2048, { -1, 108 })
 
                 drawCommandPresetList()
                 drawCommandPresetSaveModal()
